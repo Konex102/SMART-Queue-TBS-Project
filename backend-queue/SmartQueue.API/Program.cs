@@ -1,11 +1,27 @@
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using SmartQueue.API.Hubs;
 using SmartQueue.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-builder.Services.AddControllers();
-builder.Services.AddSignalR();
+// Configure JSON to preserve null entries in arrays (needed for fixed-slot ramp display)
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.Never;
+        options.JsonSerializerOptions.PropertyNamingPolicy   = JsonNamingPolicy.CamelCase;
+    });
+
+builder.Services.AddSignalR()
+    .AddJsonProtocol(options =>
+    {
+        options.PayloadSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.Never;
+        options.PayloadSerializerOptions.PropertyNamingPolicy   = JsonNamingPolicy.CamelCase;
+    });
+
 builder.Services.AddSingleton<IQueueService, QueueService>();
+builder.Services.AddHostedService<RampTimerService>();
 
 builder.Services.AddCors(options =>
 {
@@ -15,7 +31,7 @@ builder.Services.AddCors(options =>
             .WithOrigins("http://localhost:5173", "http://localhost:3000")
             .AllowAnyHeader()
             .AllowAnyMethod()
-            .AllowCredentials();   // wajib untuk SignalR
+            .AllowCredentials();
     });
 });
 

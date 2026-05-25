@@ -11,14 +11,14 @@ import { ConnectionStatus } from './components/ConnectionStatus'
 const MAX_RAMP = 6
 
 export default function App() {
-  const { state, connected, loading, toast, actions } = useQueue()
+  const { state, connected, loading, toast, actions, now, slotTimers, dwellSeconds } = useQueue()
   const rampUtilization = Math.round((state.rampQueue.length / MAX_RAMP) * 100)
-  const pressure = getQueuePressure(state.totalWaiting)
-  const lastSync = new Intl.DateTimeFormat('id-ID', {
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-  }).format(new Date())
+  const clockStr = now ? now.toLocaleTimeString('id-ID', {
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }) : '--:--:--'
+  const dateStr = now ? now.toLocaleDateString('id-ID', {
+    weekday: 'short', day: '2-digit', month: 'short', year: 'numeric',
+  }) : ''
 
   return (
     <div className="dashboard-shell">
@@ -39,74 +39,86 @@ export default function App() {
               <div className="grid gap-2 sm:grid-cols-2 xl:min-w-[700px] xl:grid-cols-4">
                 <ConnectionStatus connected={connected} compact />
                 <StatusPill label="Mode" value={state.isAutoMode ? 'AUTO' : 'MANUAL'} tone="violet" />
-                <StatusPill label="Last Sync" value={lastSync} tone="slate" />
+                <div className="signal-chip border-slate-200 bg-slate-50 text-slate-700 col-span-2 flex-col items-start gap-0">
+                  <span className="summary-label">Live Clock</span>
+                  <span className="font-display text-sm font-bold tracking-[0.08em] text-slate-800">{clockStr}</span>
+                  <span className="text-[10px] text-slate-400 uppercase tracking-[0.1em]">{dateStr}</span>
+                </div>
               </div>
             </div>
           </div>
         </header>
 
-        <main className="dashboard-grid">
-          <aside className="space-y-4 xl:col-span-3">
-            <AddVehicleForm onAdd={actions.addVehicle} loading={loading} />
-            <ControlPanel state={state} actions={actions} loading={loading} />
-          </aside>
-
-          <section className="space-y-4 xl:col-span-9">
-            <div className="grid items-stretch gap-4 lg:grid-cols-[minmax(0,1.45fr)_minmax(360px,0.95fr)]">
-              <div className="panel panel-accent-blue flex h-full flex-col">
-                <div className="panel-header">
-                  <div>
-                    <p className="panel-eyebrow">QUEUE OVERVIEW</p>
-                    <h2 className="panel-heading">Real-Time Queue Status</h2>
-                  </div>
-                  <span className="panel-pill">Live Summary</span>
-                </div>
-
-                <div className="panel-body flex flex-1 flex-col">
-                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                    <SummaryCard
-                      icon={<Clock3 size={16} />}
-                      label="Waiting"
-                      value={state.totalWaiting}
-                      detail="Kendaraan di buffer"
-                      tone="amber"
-                    />
-                    <SummaryCard
-                      icon={<Activity size={16} />}
-                      label="Ramp"
-                      value={`${state.totalOnRamp}/${MAX_RAMP}`}
-                      detail="Unit aktif"
-                      tone="emerald"
-                    />
-                    <SummaryCard
-                      icon={<Workflow size={16} />}
-                      label="Served"
-                      value={state.totalServed}
-                      detail="Sudah dilayani"
-                      tone="blue"
-                    />
-                    <SummaryCard
-                      icon={<Truck size={16} />}
-                      label="Utilization"
-                      value={`${rampUtilization}%`}
-                      detail="Kapasitas ramp"
-                      tone="violet"
-                    />
-                  </div>
+        <div className="grid gap-4">
+          <div className="grid items-stretch gap-4 lg:grid-cols-1">
+            <div className="panel panel-accent-blue text-sm">
+              <div className="panel-header">
+                <div>
+                  <p className="panel-eyebrow">OVERVIEW</p>
+                  <h2 className="panel-heading">Real-Time Status</h2>
                 </div>
               </div>
 
-              <WaitingQueue waitingQueue={state.waitingQueue} />
+              <div className="panel-body">
+                <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
+                  <SummaryCard
+                    icon={<Clock3 size={16} />}
+                    label="WAITING"
+                    value={state.totalWaiting}
+                    tone="amber"
+                  />
+                  <SummaryCard
+                    icon={<Activity size={16} />}
+                    label="LOADING RAMP"
+                    value={`${state.totalOnRamp}/${MAX_RAMP}`}
+                    tone="emerald"
+                  />
+                  <SummaryCard
+                    icon={<Workflow size={16} />}
+                    label="DONE"
+                    value={state.totalServed}
+                    tone="blue"
+                  />
+                  <SummaryCard
+                    icon={<Truck size={16} />}
+                    label="RAMP CONDITION"
+                    value={`${rampUtilization}%`}
+                    tone="violet"
+                  />
+                </div>
+              </div>
             </div>
+          </div>
 
-            <RampDisplay
-              rampQueue={state.rampQueue}
-              onServeNext={actions.serveNext}
-              loading={loading}
-              isAutoMode={state.isAutoMode}
-            />
-          </section>
-        </main>
+          <main className="dashboard-grid">
+            <aside className="space-y-4 xl:col-span-3">
+              <AddVehicleForm onAdd={actions.addVehicle} loading={loading} />
+              <ControlPanel state={state} actions={actions} loading={loading} />
+            </aside>
+
+            <section className="space-y-4 xl:col-span-9">
+              <WaitingQueue
+                waitingQueue={state.waitingQueue}
+                slotTimers={slotTimers}
+                dwellSeconds={dwellSeconds}
+                rampLineA={state.rampLineA}
+                rampLineB={state.rampLineB}
+                isAutoMode={state.isAutoMode}
+              />
+
+              <RampDisplay
+                rampLineA={state.rampLineA}
+                rampLineB={state.rampLineB}
+                onServeNext={actions.serveNext}
+                onServeById={actions.serveById}
+                loading={loading}
+                isAutoMode={state.isAutoMode}
+                slotTimers={slotTimers}
+                dwellSeconds={dwellSeconds}
+              />
+            </section>
+          </main>
+        </div>
       </div>
 
       <Toast toast={toast} />
@@ -130,14 +142,14 @@ function SummaryCard({ icon, label, value, detail, tone = 'blue' }) {
   }
 
   return (
-    <div className={`summary-card ${toneClasses[tone] ?? toneClasses.blue}`}>
-      <div className="flex items-start justify-between gap-3">
+    <div className={`summary-card ${toneClasses[tone] ?? toneClasses.blue} p-2`}> 
+      <div className="flex items-start justify-between gap-2">
         <div>
           <p className="summary-label">{label}</p>
-          <p className="summary-value">{value}</p>
+          <p className="summary-value text-[1.05rem]">{value}</p>
           <p className="summary-meta">{detail}</p>
         </div>
-        <div className={`flex h-9 w-9 items-center justify-center rounded-xl border ${iconClasses[tone] ?? iconClasses.blue}`}>
+        <div className={`flex h-7 w-7 items-center justify-center rounded-xl border ${iconClasses[tone] ?? iconClasses.blue}`}>
           {icon}
         </div>
       </div>
@@ -177,16 +189,4 @@ function InfoBlock({ title, detail, tone = 'blue' }) {
       <p className="mt-2 text-sm leading-6 text-slate-600">{detail}</p>
     </div>
   )
-}
-
-function getQueuePressure(totalWaiting) {
-  if (totalWaiting >= 7) {
-    return { label: 'HIGH', tone: 'rose' }
-  }
-
-  if (totalWaiting >= 4) {
-    return { label: 'WATCH', tone: 'amber' }
-  }
-
-  return { label: 'STABLE', tone: 'blue' }
 }
