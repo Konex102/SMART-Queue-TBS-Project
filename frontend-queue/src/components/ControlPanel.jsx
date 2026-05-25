@@ -20,21 +20,19 @@ export function ControlPanel({ state, actions, loading }) {
 
       <div className="panel-body space-y-5">
         <section>
-          <p className="metric-label">Mode sistem</p>
-          <div className="mt-2 grid gap-2 sm:grid-cols-2">
+          <p className="metric-label">QUEUE MODE</p>
+          <div className="mt-2 grid gap-1 sm:grid-cols-2">
             {[
               {
                 label: 'Auto',
                 value: true,
                 icon: <Zap size={16} />,
-                detail: 'Ramp diisi otomatis.',
                 activeClassName: 'border-blue-200 bg-blue-50 text-blue-700',
               },
               {
                 label: 'Manual',
                 value: false,
                 icon: <Settings size={16} />,
-                detail: 'Transfer oleh operator.',
                 activeClassName: 'border-violet-200 bg-violet-50 text-violet-700',
               },
             ].map((option) => {
@@ -64,83 +62,31 @@ export function ControlPanel({ state, actions, loading }) {
           {!isAutoMode && (
             <button
               onClick={actions.moveToRamp}
-              disabled={loading || totalWaiting === 0}
+              disabled={loading || totalWaiting === 0 || totalOnRamp >=6}
               className="btn-secondary mt-3 w-full"
             >
               <ArrowDown size={16} />
-              Transfer ke Ramp
+              MOVE TO LOADING RAMP
             </button>
           )}
         </section>
 
-        <section className="grid gap-2 sm:grid-cols-3">
-          <StatCard label="Waiting" value={totalWaiting} tone="amber" />
-          <StatCard label="On Ramp" value={totalOnRamp} tone="emerald" />
-          <StatCard label="Served" value={totalServed} tone="blue" />
-        </section>
-
-        {/* <section className="border-t border-slate-200 pt-4">
-          <div className="flex items-center gap-2">
-            <History size={14} className="text-violet-700" />
-            <p className="metric-label">Riwayat dilayani</p>
-          </div>
-
-          {servedHistory.length === 0 ? (
-            <div className="empty-state mt-3 px-4 py-6 text-center">
-              <p className="font-display text-base font-bold uppercase tracking-[0.12em] text-slate-800">
-                Belum ada riwayat
-              </p>
-              <p className="mt-1 text-sm text-slate-500">
-                Kendaraan yang selesai diproses akan tampil di sini.
-              </p>
-            </div>
-          ) : (
-            <div className="mt-3 space-y-2">
-              {servedHistory.slice(0, 5).map((vehicle, index) => (
-                <div key={vehicle.id} className="summary-card">
-                  <div className="flex items-center gap-3">
-                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-700">
-                      <CheckCircle2 size={16} />
-                    </div>
-                    <div className="flex-1">
-                      <VehicleBadge vehicle={vehicle} size="sm" />
-                    </div>
-                    <span className="summary-label">#{String(index + 1).padStart(2, '0')}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="border-t border-slate-200 pt-4">
+        <section>
           {!showClearConfirm ? (
             <>
-              <div className="flex items-start gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 bg-rose-50 text-rose-600">
-                  <RotateCcw size={16} />
-                </div>
-                <div>
-                  <p className="metric-label">Reset sistem</p>
-                  <p className="mt-1 text-sm text-slate-500">
-                    Hapus antrian aktif dan riwayat layanan.
-                  </p>
-                </div>
-              </div>
-
-              <button onClick={() => setShowClearConfirm(true)} className="btn-danger mt-3 w-full">
-                Reset Semua
+              <button onClick={() => setShowClearConfirm(true)} className="btn-danger mt-1 w-full">
+                RESET DATA
               </button>
             </>
           ) : (
             <div className="animate-fade-in">
-              <p className="metric-label">Konfirmasi reset</p>
+              <p className="metric-label">Reset Confirmation</p>
               <p className="mt-2 text-sm text-slate-500">
-                Jalur tunggu, ramp, dan riwayat akan dibersihkan.
+                Data History Will Delete!
               </p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 <button onClick={() => setShowClearConfirm(false)} className="btn-secondary">
-                  Batal
+                  Cancel
                 </button>
                 <button
                   onClick={() => {
@@ -149,12 +95,12 @@ export function ControlPanel({ state, actions, loading }) {
                   }}
                   className="btn-danger"
                 >
-                  Ya, Reset
+                  Yes, Reset Data
                 </button>
               </div>
             </div>
           )}
-        </section> */}
+        </section>
       </div>
     </div>
   )

@@ -10,7 +10,7 @@ namespace SmartQueue.API.Controllers;
 [Route("api/[controller]")]
 public class QueueController : ControllerBase
 {
-    private readonly IQueueService   _queueService;
+    private readonly IQueueService _queueService;
     private readonly IHubContext<QueueHub> _hubContext;
 
     public QueueController(IQueueService queueService, IHubContext<QueueHub> hubContext)
@@ -38,13 +38,28 @@ public class QueueController : ControllerBase
         return Ok(vehicle);
     }
 
-    // POST /api/queue/serve
+    // POST /api/queue/serve  ← serves first vehicle in priority order
     [HttpPost("serve")]
     public async Task<IActionResult> ServeNext()
     {
         var vehicle = _queueService.ServeNext();
         if (vehicle == null)
             return NotFound(new { error = "Tidak ada kendaraan di ramp." });
+
+        await BroadcastState();
+        return Ok(vehicle);
+    }
+
+    // POST /api/queue/serve/{id}  ← operator picks a specific vehicle (Manual mode)
+    [HttpPost("serve/{id}")]
+    public async Task<IActionResult> ServeById(string id)
+    {
+        if (string.IsNullOrWhiteSpace(id))
+            return BadRequest(new { error = "Id kendaraan tidak valid." });
+
+        var vehicle = _queueService.ServeVehicleById(id);
+        if (vehicle == null)
+            return NotFound(new { error = $"Kendaraan dengan id '{id}' tidak ditemukan di ramp." });
 
         await BroadcastState();
         return Ok(vehicle);
@@ -59,7 +74,7 @@ public class QueueController : ControllerBase
         return Ok(new { isAutoMode = request.IsAutoMode });
     }
 
-    // POST /api/queue/move-to-ramp  ← hanya aktif di mode Manual
+    // POST /api/queue/move-to-ramp  ← Manual mode only
     [HttpPost("move-to-ramp")]
     public async Task<IActionResult> MoveToRamp()
     {
