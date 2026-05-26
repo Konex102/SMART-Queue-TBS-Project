@@ -185,11 +185,6 @@ export function useQueue() {
   }
 }
 
-/**
- * Normalise server response.
- * RampLineA / RampLineB arrive as fixed-length arrays that may contain null
- * entries (empty slots). We preserve nulls — UI uses slot index directly.
- */
 function normalise(raw) {
   if (!raw) return INITIAL_STATE
 

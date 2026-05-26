@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { Plus } from 'lucide-react'
 
-const KUD_CATS = ['A', 'B', 'C', 'D', 'E']
+const KUD_CATS = ['MAKMUR JAYA', 'KARYA ABADI', 'BUDI CIPTA', 'INDAH BUANA', 'ABADA SATYA']
 
 const TYPE_OPTIONS = [
   {
@@ -87,10 +87,9 @@ export function AddVehicleForm({ onAdd, loading }) {
               <div>
                 <p className="metric-label">KUD CAtegory</p>
               </div>
-              <span className="panel-pill">Class {kudCategory}</span>
             </div>
 
-            <div className="mt-3 grid grid-cols-5 gap-2">
+            <div className="mt-2 grid grid-cols-3 gap-2">
               {KUD_CATS.map((category) => {
                 const isActive = kudCategory === category
 

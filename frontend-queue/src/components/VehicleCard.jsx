@@ -20,7 +20,7 @@ const KUD_LABEL_COLORS = {
 export function VehicleBadge({ vehicle, size = 'md', showPosition = false }) {
   const isKud = vehicle.type === 1 || vehicle.type === 'KUD'
   const category = vehicle.kudCategory
-  const categoryKey = typeof category === 'number' ? ['', 'A', 'B', 'C', 'D', 'E'][category] : category
+  const categoryKey = typeof category === 'number' ? ['', 'MAKMUR JAYA', 'KARYA ABADI', 'BUDI CIPTA', 'INDAH BUANA', 'ABADA SATYA'][category] : category
   const sizeClassNames = {
     sm: 'px-3 py-2',
     md: 'px-3.5 py-3',
