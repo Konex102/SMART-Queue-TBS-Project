@@ -9,11 +9,7 @@ public class RampTimerService : BackgroundService
     private readonly IQueueService _queueService;
     private readonly IHubContext<QueueHub> _hubContext;
     private readonly ILogger<RampTimerService> _logger;
-
-    /// <summary>How long a vehicle stays on the ramp before being auto-served. Default: 120 seconds (2 minutes).</summary>
     private readonly int _dwellSeconds;
-
-    /// <summary>Minimum gap between successive vehicles entering the ramp in AUTO mode. Default: 60 seconds (1 minute).</summary>
     private readonly int _entryIntervalSeconds;
 
     public RampTimerService(
@@ -26,7 +22,6 @@ public class RampTimerService : BackgroundService
         _hubContext          = hubContext;
         _logger              = logger;
 
-        // appsettings.json overrides; defaults: 120s dwell, 60s entry interval
         _dwellSeconds        = configuration.GetValue<int>("RampTimer:DwellSeconds",        120);
         _entryIntervalSeconds = configuration.GetValue<int>("RampTimer:EntryIntervalSeconds", 60);
 
@@ -58,7 +53,6 @@ public class RampTimerService : BackgroundService
 
             if (_queueService.IsAutoMode)
             {
-                // ── 1. Auto-serve vehicles that have been on the ramp ≥ dwellSeconds ──
                 var dwellThreshold = TimeSpan.FromSeconds(_dwellSeconds);
                 var expired = _queueService.GetExpiredRampVehicles(dwellThreshold);
 
@@ -74,7 +68,16 @@ public class RampTimerService : BackgroundService
                     }
                 }
 
-                // ── 2. Move next waiting vehicle to ramp if entry interval has elapsed ──
+                var movedEligible = _queueService.MoveEligibleWaitingToRamp();
+                if (movedEligible is not null)
+                {
+                    stateChanged = true;
+                    _logger.LogInformation(
+                        "AUTO-ENTER (wait elapsed): {plate} moved to ramp",
+                        movedEligible.PlateNumber
+                    );
+                }
+
                 var timeSinceLastEntry = DateTime.UtcNow - _queueService.LastRampEntryTime;
                 if (timeSinceLastEntry >= TimeSpan.FromSeconds(_entryIntervalSeconds))
                 {
@@ -94,11 +97,8 @@ public class RampTimerService : BackgroundService
                 var updatedState = _queueService.GetState();
                 await _hubContext.Clients.All.SendAsync("StateUpdate", updatedState);
             }
-
-            // ── 3. Broadcast per-slot countdown timers every tick ──
             var state = _queueService.GetState();
 
-            // Also include the "next entry" countdown so the UI can show it
             int? nextEntryIn = null;
             if (_queueService.IsAutoMode)
             {

@@ -5,7 +5,6 @@ using SmartQueue.API.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configure JSON to preserve null entries in arrays (needed for fixed-slot ramp display)
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {

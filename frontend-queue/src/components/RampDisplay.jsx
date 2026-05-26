@@ -30,7 +30,7 @@ export function RampDisplay({
 
       <div className="panel-body space-y-4">
         {/* Ramp Lines */}
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid gap-2 lg:grid-cols-2">
           <RampLine
             label="Ramp Line A"
             accentClass="border-emerald-200 bg-emerald-50/40"
@@ -56,15 +56,10 @@ export function RampDisplay({
             loading={loading}
           />
         </div>
-
-        {/* Bottom info panel */}
-        <div className={`grid gap-3 ${isAutoMode ? 'md:grid-cols-3' : 'md:grid-cols-2'}`}>
-        </div>
       </div>
     </div>
   )
 }
-
 
 function RampLine({ label, accentClass, badgeClass, slots, startIndex, isAutoMode, slotTimers, dwellSeconds, onServeById, loading }) {
   const slotsWithEmpties = Array.from({ length: LINE_CAPACITY }, (_, i) => slots[i] ?? null)

@@ -12,25 +12,13 @@ public class QueueService : IQueueService
     private const int MaxRampSize            = LineCapacity * 2; // 6 total
     private const int MaxServedHistory       = 100;
     private const int KudCategoryDeferSlots  = 6;
-
-    /// <summary>
-    /// In AUTO mode, vehicles enter the ramp one at a time.
-    /// Tracks the last ramp-entry timestamp to enforce the entry interval.
-    /// </summary>
     private DateTime _lastRampEntryTime = DateTime.MinValue;
 
     private bool _isAutoMode = true;
     public bool IsAutoMode { get { lock (_lock) return _isAutoMode; } }
-
-    /// <summary>UTC time the last vehicle entered the ramp (AUTO mode only).</summary>
     public DateTime LastRampEntryTime { get { lock (_lock) return _lastRampEntryTime; } }
-
     private readonly object _lock = new();
-
-    // ─────────────────────────────────────────────────────────────────────────
-    // Public interface
-    // ─────────────────────────────────────────────────────────────────────────
-
+    private static readonly TimeSpan MinWaitBeforeRamp = TimeSpan.FromMinutes(1);
     public QueueState GetState()
     {
         lock (_lock) return BuildState();
@@ -57,10 +45,8 @@ public class QueueService : IQueueService
             _waitingQueue.Add(vehicle);
             ReorderWaiting();
 
-            // In AUTO mode the first vehicle should enter immediately if ramp has space
-            // and the entry timer has expired. Subsequent ones wait for the interval.
-            if (_isAutoMode)
-                TryFillOneSlotImmediate();
+            // if (_isAutoMode)
+            //     TryFillOneSlotImmediate();
 
             RecalculatePositions();
             return vehicle;
@@ -80,6 +66,23 @@ public class QueueService : IQueueService
                     return FinaliseServed(_slotsB, i);
 
             return null;
+        }
+    }
+
+    public Vehicle? MoveEligibleWaitingToRamp()
+    {
+        lock (_lock)
+        {
+            if(!_isAutoMode)
+                return null;
+            if(OccupiedCount >= MaxRampSize)
+                return null;
+            if(!HasEligibleWaiting())
+                return null;
+            
+            var moved = PullOneFromWaiting();
+            RecalculatePositions();
+            return moved;
         }
     }
 
@@ -122,15 +125,12 @@ public class QueueService : IQueueService
             _isAutoMode = isAutoMode;
             if (_isAutoMode)
             {
-                // Reset interval so the very first vehicle enters immediately
                 _lastRampEntryTime = DateTime.MinValue;
                 TryFillOneSlotImmediate();
             }
             RecalculatePositions();
         }
     }
-
-    /// <summary>Manual mode — operator explicitly moves one vehicle to ramp.</summary>
     public void MoveToRamp()
     {
         lock (_lock)
@@ -140,10 +140,6 @@ public class QueueService : IQueueService
         }
     }
 
-    /// <summary>
-    /// AUTO mode — RampTimerService calls this every second once the entry
-    /// interval has elapsed.  Moves exactly ONE vehicle to ramp.
-    /// </summary>
     public Vehicle? MoveOneToRamp()
     {
         lock (_lock)
@@ -171,23 +167,24 @@ public class QueueService : IQueueService
         }
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-    // Private helpers
-    // ─────────────────────────────────────────────────────────────────────────
-
     private int OccupiedCount =>
         _slotsA.Count(v => v is not null) + _slotsB.Count(v => v is not null);
 
-    /// <summary>
-    /// Used internally (e.g., on AddVehicle / SetMode) to fill one slot
-    /// RIGHT NOW, bypassing the interval timer check.
-    /// The interval timer in RampTimerService controls ongoing entries.
-    /// </summary>
     private void TryFillOneSlotImmediate()
     {
-        if (_waitingQueue.Count == 0) return;
-        if (OccupiedCount >= MaxRampSize) return;
+        if (_waitingQueue.Count == 0) 
+            return;
+        if (OccupiedCount >= MaxRampSize) 
+            return;
+        if (!HasEligibleWaiting())
+            return;
         PullOneFromWaiting();
+    }
+
+    private bool HasEligibleWaiting()
+    {
+        var now = DateTime.UtcNow;
+        return _waitingQueue.Any(v => (now - v.EntryTime) >= MinWaitBeforeRamp);
     }
 
     private Vehicle FinaliseServed(Vehicle?[] slots, int slotIndex)
@@ -208,16 +205,24 @@ public class QueueService : IQueueService
         if (vehicle.Type == VehicleType.TBS_KUD)
             DeferNextKudOfCategory(vehicle.KudCategory);
 
-        // AUTO mode: do NOT immediately fill the freed slot — RampTimerService
-        // will do so after the 60-second entry interval elapses.
-
         RecalculatePositions();
         return vehicle;
     }
 
     private Vehicle? PullOneFromWaiting()
     {
-        if (_waitingQueue.Count == 0) return null;
+        if (_waitingQueue.Count == 0) 
+            return null;
+
+        var now = DateTime.UtcNow;
+
+        var eligibleIndex = _waitingQueue
+            .Select((v,i) => (v,i))
+            .FirstOrDefault(x => (now - x.v.EntryTime) >= MinWaitBeforeRamp);
+        
+        if (eligibleIndex == default &&
+            !((now - _waitingQueue[0].EntryTime) >= MinWaitBeforeRamp))
+            return null;
 
         for (int i = 0; i < LineCapacity; i++)
             if (_slotsA[i] is null)
@@ -230,11 +235,11 @@ public class QueueService : IQueueService
         return null;
     }
 
-    private Vehicle PullIntoSlot(Vehicle?[] slots, int slotIndex, RampLine line)
+    private Vehicle PullIntoSlot(Vehicle?[] slots, int slotIndex, RampLine line, int waitingIndex = 0)
     {
         ReorderWaiting();
-        var next = _waitingQueue[0];
-        _waitingQueue.RemoveAt(0);
+        var next = _waitingQueue[waitingIndex];
+        _waitingQueue.RemoveAt(waitingIndex);
 
         next.Status        = VehicleStatus.OnRamp;
         next.RampLine      = line;
@@ -242,7 +247,7 @@ public class QueueService : IQueueService
         next.RampEntryTime = DateTime.UtcNow;
 
         slots[slotIndex]   = next;
-        _lastRampEntryTime = DateTime.UtcNow;   // ← record entry timestamp
+        _lastRampEntryTime = DateTime.UtcNow;
         return next;
     }
 
